@@ -42,18 +42,21 @@ struct Node {
 
 extern Node *expr();
 
-
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
+Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
+  return node;
+}
+
+Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
+  Node *node = new_node(kind);
   node->lhs  = lhs;
   node->rhs  = rhs;
   return node;
 }
 
-Node *new_node_num(int val) {
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = ND_NUM;
+Node *new_num(int val) {
+  Node *node = new_node(ND_NUM);
   node->val  = val;
   return node;
 }
@@ -186,7 +189,8 @@ Token *tokenize() {
 /*
   BNF
   expr = mul ("+" mul | "-" mul)*
-  mul  = primary ("*" primary | "/" primary)*
+  mul  = unary ("*" unary | "/" unary)*
+  unary = ("+" | "-")? primary
   primary = num | "(" expr ")"
  */
 
@@ -196,19 +200,28 @@ Node *primary() {
       expect(')');
       return node;
     } else {
-      return new_node_num(expect_number());
+      return new_num(expect_number());
     }
 }
 
+Node *unary() {
+  if (consume('+')) {
+    return unary();
+  } else if (consume('-')) {
+    return new_binary(ND_SUB, new_num(0), unary());
+  } else {
+    return primary();
+  }
+}
 
 Node *mul() {
-  Node *node = primary();
+  Node *node = unary();
 
   for (;;) {
     if (consume('*')) {
-      node = new_node(ND_MUL, node, primary());
+      node = new_binary(ND_MUL, node, unary());
     } else if (consume('/')) {
-      node = new_node(ND_DIV, node, primary());
+      node = new_binary(ND_DIV, node, unary());
     } else {
       return node;
     }
@@ -220,9 +233,9 @@ Node *expr(){
 
   for (;;) {
     if (consume('+')) {
-      node = new_node(ND_ADD, node, mul());
+      node = new_binary(ND_ADD, node, mul());
     } else if (consume('-')) {
-      node = new_node(ND_SUB, node, mul());
+      node = new_binary(ND_SUB, node, mul());
     } else {
       return node;
     }
@@ -262,8 +275,7 @@ void gen(Node *node) {
 
 int main(int argc, char **argv) {
   if (argc != 2) {
-    fprintf(stderr, "Wrong number of args\n");
-    return 1;
+    error("%s: Wrong number of args", argv[0]);
   }
 
   user_input = argv[1];
