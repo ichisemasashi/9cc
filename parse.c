@@ -1,5 +1,8 @@
 #include "9cc.h"
 
+// local variables
+LVar *locals;
+
 static Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -126,6 +129,16 @@ static bool startswith(char *p, char *q) {
   return (memcmp(p, q, strlen(q)) == 0);
 }
 
+static bool is_ident1(char c) {
+  return (('a' <= c && c <= 'z') ||
+	  ('A' <= c && c <= 'Z') ||
+	  c == '_');
+}
+
+static bool is_ident2(char c) {
+  return (is_ident1(c) || ('0' <= c && c <= '9'));
+}
+
 
 /*
   tokenize input strings p.
@@ -143,8 +156,12 @@ void tokenize() {
       continue;
     }
 
-    if ('a' <= *p && *p <= 'z') {
-      cur = new_token(TK_IDENT, cur, p++, 1);
+    if (is_ident1(*p)) {
+      char *start = p;
+      do {
+	p++;
+      } while (is_ident2(*p));
+      cur = new_token(TK_IDENT, cur, start, (p - start));
       continue;
     }
 
@@ -194,6 +211,20 @@ void tokenize() {
 
 Node *code[100];
 
+/*
+  search valiable by name.
+  if faile, return NULL
+ */
+LVar *find_lvar(Token *tk) {
+  for (LVar *var = locals; var != NULL; var = var->next) {
+    if (var->len == tk->len &&
+	!memcmp(tk->str, var->name, var->len)) {
+      return var;
+    }
+  }
+  return NULL;
+}
+
 static Node *primary() {
   Token *tk;
 
@@ -203,7 +234,22 @@ static Node *primary() {
     return node;
   } else if ((tk = consume_ident()) != NULL) {
     Node *node = new_node(ND_LVAR);
-    node->offset = (tk->str[0] - 'a' + 1) * 8;
+    LVar *lvar = find_lvar(tk);
+    if (lvar != NULL) {
+      node->offset = lvar->offset;
+    } else {
+      lvar = calloc(1, sizeof(LVar));
+      lvar->next   = locals;
+      lvar->name   = tk->str;
+      lvar->len    = tk->len;
+      if (locals == NULL) {
+	lvar->offset = 8;
+      } else {
+	lvar->offset = locals->offset + 8;
+      }
+      node->offset = lvar->offset;
+      locals = lvar;
+    }
     return node;
   }else {
       return new_num(expect_number());

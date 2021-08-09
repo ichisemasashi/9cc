@@ -49,9 +49,22 @@ struct Node {
   int offset;    // only kind=ND_LVAR
 };
 
+typedef struct LVar LVar;
+
+// type of local variable
+struct LVar {
+  LVar *next; // next val or NULL
+  char *name; // name of val
+  int len;    // length of name
+  int offset; // offset from RBP
+};
+
+
+
 extern Token *token;
 extern char *user_input;
 extern Node *code[];
+extern LVar *locals;
 
 extern void program();
 extern Node *expr();
