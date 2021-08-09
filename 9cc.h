@@ -9,6 +9,7 @@
 // Types of Token
 typedef enum {
 	      TK_RESERVED, // symbols
+	      TK_IDENT,    // ID
 	      TK_NUM,      // numbers
 	      TK_EOF,      // end of input
 } TokenKind;
@@ -32,6 +33,8 @@ typedef enum {
 	      ND_NE,  // !=
 	      ND_LT,  // <
 	      ND_LE,  // <=
+	      ND_ASSIGN, // =
+	      ND_LVAR,  // local variable
 	      ND_NUM, // integers
 } NodeKind;
 
@@ -43,15 +46,18 @@ struct Node {
   Node *lhs;     // left hand side
   Node *rhs;     // right hand side
   int val;       // only kind=ND_NUM
+  int offset;    // only kind=ND_LVAR
 };
 
 extern Token *token;
 extern char *user_input;
+extern Node *code[];
 
+extern void program();
 extern Node *expr();
 extern void error(char *fmt, ...);
 extern void error_at(char *loc, char *fmt, ...);
-extern Token *tokenize();
+extern void tokenize();
 extern Node *expr();
-extern void gen(Node *node);
+extern void gen();
 

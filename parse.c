@@ -68,6 +68,16 @@ static bool consume(char *op) {
   return true;
 }
 
+static Token *consume_ident() {
+  if (token->kind == TK_IDENT) {
+    Token *ret = token;
+    token = token->next;
+    return ret;
+  }
+
+  return NULL;
+}
+
 /*
   if next token is the symbol of expected, token++.
   otherwise report error.
@@ -95,11 +105,10 @@ static int expect_number() {
   token = token->next;
   return val;
 }
-/* 
+
 static bool at_eof() {
   return token->kind == TK_EOF;
 }
-*/
 
 /*
   make new Token and concat cur
@@ -119,9 +128,9 @@ static bool startswith(char *p, char *q) {
 
 
 /*
-  tokenize input strings p and return it.
+  tokenize input strings p.
  */
-Token *tokenize() {
+void tokenize() {
   char *p = user_input;
   Token head;
   head.next = NULL;
@@ -134,6 +143,11 @@ Token *tokenize() {
       continue;
     }
 
+    if ('a' <= *p && *p <= 'z') {
+      cur = new_token(TK_IDENT, cur, p++, 1);
+      continue;
+    }
+
     if (startswith(p, "==") ||
 	startswith(p, "!=") ||
 	startswith(p, "<=") ||
@@ -143,7 +157,7 @@ Token *tokenize() {
       continue;
     }
 
-    if (strchr("+-*/()<>", *p)) {
+    if (strchr("=+-*/()<>;", *p)) {
       cur = new_token(TK_RESERVED, cur, p++, 1);
       continue;
     }
@@ -160,27 +174,40 @@ Token *tokenize() {
   }
 
   new_token(TK_EOF, cur, p, 0);
-  return head.next;
+  token =  head.next;
+  return;
 }
 
 /*
   BNF
-  expr = equality
+  program = stmt*
+  stmt = expr ";"
+  expr = assign
+  assign = equality ("=" assign)?
   equality = relational ("==" rerational | "!=" relational)*
   relational = add ("<" add | "<=" add | ">" add | ">=" add)*
   add = mul ("+" mul | "-" mul)*
   mul  = unary ("*" unary | "/" unary)*
   unary = ("+" | "-")? primary
-  primary = num | "(" expr ")"
+  primary = num | ident | "(" expr ")"
  */
+
+Node *code[100];
+
 static Node *primary() {
+  Token *tk;
+
   if (consume("(")) {
-      Node *node = expr();
-      expect(")");
-      return node;
-    } else {
+    Node *node = expr();
+    expect(")");
+    return node;
+  } else if ((tk = consume_ident()) != NULL) {
+    Node *node = new_node(ND_LVAR);
+    node->offset = (tk->str[0] - 'a' + 1) * 8;
+    return node;
+  }else {
       return new_num(expect_number());
-    }
+  }
 }
 
 static Node *unary() {
@@ -253,6 +280,30 @@ static Node *equality() {
   }
 }
 
+static Node *assign() {
+  Node *node = equality();
+  if (consume("=")) {
+    node = new_binary(ND_ASSIGN, node, assign());
+  }
+
+  return node;
+}
+
 Node *expr() {
-  return equality();
+  return assign();
+}
+
+static Node *stmt() {
+  Node *node = expr();
+  expect(";");
+  return node;
+}
+
+void program() {
+  int i = 0;
+  while(!at_eof()) {
+    code[i] = stmt();
+    i++;
+  }
+  code[i] = NULL;
 }

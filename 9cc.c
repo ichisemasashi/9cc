@@ -9,17 +9,25 @@ int main(int argc, char **argv) {
   user_input = argv[1];
   
   // Tokenize
-  token = tokenize();
-  Node *node = expr();
-  
+  tokenize();
+  program();
+
+  // assenbry header
   printf(".intel_syntax noprefix\n");
   printf(".globl main\n");
   printf("main:\n");
 
-  // code generate down to AST
-  gen(node);
+  // prologue: get 26*8 memory for variables
+  printf("  push rbp\n");
+  printf("  mov rbp, rsp\n");
+  printf("  sub rsp, 208\n");
 
-  printf("  pop rax\n");
+  // code generate down to AST
+  gen();
+
+  // epiloge: return the last val on RAX.
+  printf("  mov rsp, rbp\n");
+  printf("  pop rbp\n");
   printf("  ret\n");
   return 0;
 }
